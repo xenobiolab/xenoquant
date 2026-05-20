@@ -78,6 +78,10 @@ conda env create -f xenoquant-re.yml
 - Ubuntu 20.04
 - Ubuntu 22.04
 
+**Tested Hardware:**
+- Nvidia RTX 3060 (12 GB)
+- Intel I7-11700
+- 32 GB DDR4 (3200 MHz)
 ---
 
 ## Core CLI: `xenoquant.py`
