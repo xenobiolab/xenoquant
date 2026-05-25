@@ -1,10 +1,10 @@
 # xenoquant
 
-**xenoquant** is a neural network training and analysis pipeline for nanopore sequencing of alternative base pairs (XNAs). It integrates Oxford Nanopore Technologies (ONT) workflows with Remora-based model training, reference-localized XNA detection, demultiplexing, signal-level visualization, and downstream analysis.
+**xenoquant** is a neural network training and analysis pipeline for nanopore sequencing of unnatural base pairs (UBPs). It integrates Oxford Nanopore Technologies (ONT) workflows with Remora-based model training, reference-localized UBP detection, demultiplexing, signal-level visualization, and downstream analysis.
 
 The software is organized around two layers:
 
-- **`xenoquant.py`** — core engine for model training and XNA-aware basecalling
+- **`xenoquant.py`** — core engine for model training and UBP-aware basecalling
 - **`xenoquant_pipe.py`** — master orchestration script for training, basecalling, demultiplexing, analysis, and visualization
 
 This software has been tested on ONT **R9.4.1** and **R10.4.1** flow cells (**Flongle** and **MinION**) using **Remora 2.1.3**. This project is under active development.
@@ -15,8 +15,8 @@ This software has been tested on ONT **R9.4.1** and **R10.4.1** flow cells (**Fl
 
 xenoquant supports:
 
-- Training Remora-compatible RNN models for XNA detection
-- Reference-localized XNA basecalling
+- Training Remora-compatible RNN models for UBP detection
+- Reference-localized UBP basecalling
 - POD5-based nanopore preprocessing
 - Alignment result extraction
 - Barcode demultiplexing (cutadapt-based)
@@ -30,7 +30,7 @@ xenoquant supports:
 
 Models are trained on **defined sequence contexts**, not the full sequence space. For best performance, training should include:
 
-1. A dataset containing the XNA substitution
+1. A dataset containing the UB substitution
 2. A matched dataset containing the corresponding canonical DNA sequence
 
 ---
@@ -185,7 +185,7 @@ Use the following examples by editing the configuration section at the top of
 
 #### 1. Train a sample BS-vs-AT model
 
-The `BS_Train_subset` directory contains reads with the `B` XNA context, and
+The `BS_Train_subset` directory contains reads with the `B` UB context, and
 `AT_Train_subset` is the matched canonical comparison set. Both use the same
 reference because the `B` in the FASTA marks the position used for chunking and
 model training.
@@ -286,13 +286,13 @@ The same `xenoquant_pipe.py` workflow is used to reproduce the trained models
 reported in the paper. For each reported model or sequence context:
 
 1. Set `working_dir` to a new output directory for that model.
-2. Set `xna_fast5_dir` to the full POD5 or FAST5 directory containing the XNA
+2. Set `xna_fast5_dir` to the full POD5 or FAST5 directory containing the UB
    training reads.
 3. Set `dna_fast5_dir` to the matched canonical DNA training reads.
 4. Set `xna_ref_fasta` and `dna_ref_fasta` to the reference FASTA files used for
-   that model. The FASTA sequence must contain the XNA base abbreviation at the
+   that model. The FASTA sequence must contain the UB base abbreviation at the
    position used for training.
-5. Confirm the XNA and canonical labels in `lib/xr_params.py`, especially
+5. Confirm the UB and canonical labels in `lib/xr_params.py`, especially
    `mod_base`, `can_base`, `confounding_pairs`, `kmer_context`,
    `chunk_context`, `chunk_num`, `val_proportion`, `balance_chunks`,
    `ml_model_path`, and `kmer_table_path`.
@@ -322,16 +322,16 @@ stage manually, but the pipe file is the recommended reproducibility interface.
 
 The `train` command builds a model from two nanopore datasets:
 
-1. Reads containing the XNA substitution
+1. Reads containing the UB substitution
 2. Reads containing the canonical DNA comparison
 
-Each dataset requires a reference FASTA file that contains the XNA base abbreviation in the sequence so the model focus position can be defined.
+Each dataset requires a reference FASTA file that contains the UB base abbreviation in the sequence so the model focus position can be defined.
 
 #### Required inputs
 - Desired output directory 
-- FAST5 or POD5 directory containing XNA substitution
+- FAST5 or POD5 directory containing UB substitution
 - FAST5 or POD5 directory containing canonical DNA comparison 
-- Reference file (`.fa`) for XNA dataset
+- Reference file (`.fa`) for UB dataset
 - Reference file (`.fa`) for canonical DNA dataset
 
 #### Training workflow
@@ -340,7 +340,7 @@ Each dataset requires a reference FASTA file that contains the XNA base abbrevia
 2. Perform initial basecalling
 3. Align reads to the reference
 4. Convert FASTA to xFASTA
-5. Generate BED files marking XNA positions
+5. Generate BED files marking UB positions
 6. Generate Remora chunks
 7. Merge chunks
 8. Train LSTM RNN model
@@ -364,8 +364,8 @@ model_best.pt
 ```bash
 python xenoquant.py train \
     -w [desired_output_directory] \
-    -f [xna_pod5_directory] [dna_pod5_directory] \
-    -r [xna_reference.fa] [dna_reference.fa]
+    -f [ub_pod5_directory] [dna_pod5_directory] \
+    -r [ub_reference.fa] [dna_reference.fa]
 ```
 
 ---
@@ -378,7 +378,7 @@ The `basecall` command applies a trained model to new reads.
 
 - Desired output directory
 - POD5 directory
-- Reference FASTA containing XNA positions in the sequence
+- Reference FASTA containing UB positions in the sequence
 - Trained model (`.pt`)
 
 #### Processing workflow
@@ -387,7 +387,7 @@ The `basecall` command applies a trained model to new reads.
 2. Perform initial basecalling
 3. Align reads to the reference
 4. Convert FASTA to xFASTA
-5. Generate BED files marking XNA positions
+5. Generate BED files marking UB positions
 6. Generate Remora chunks
 7. Model inference
 
@@ -401,8 +401,8 @@ Per-read results include:
 
 - `read_id`
 - alignment position
-- reference label (`1 = XNA`, `0 = DNA`)
-- predicted class (`1 = XNA`, `0 = DNA`)
+- reference label (`1 = UB`, `0 = DNA`)
+- predicted class (`1 = UB`, `0 = DNA`)
 - class probabilities
 
 #### Command
@@ -494,7 +494,7 @@ Signal-level visualizations are supported for trained or basecalled datasets.
 - `xr_violin.py`
 - `xr_extract_metrics.py`
 
-These modules operate on the working directory and require specification of the XNA base, retrieved from `xr_params.py`.
+These modules operate on the working directory and require specification of the UB base, retrieved from `xr_params.py`.
 
 ### Available visualizations
 
@@ -508,7 +508,7 @@ These modules operate on the working directory and require specification of the 
 
 ## Model Characteristics and Limitations
 
-Models are trained on **±50 signal datapoints** surrounding the XNA position defined in the BED file. This corresponds roughly to **±5 to 10 nucleotides** of sequence context, depending on pore chemistry.
+Models are trained on **±50 signal datapoints** surrounding the UB position defined in the BED file. This corresponds roughly to **±5 to 10 nucleotides** of sequence context, depending on pore chemistry.
 
 Important considerations:
 
@@ -521,9 +521,9 @@ Important considerations:
 
 ## xFASTA Format
 
-xenoquant uses **xFASTA** to encode XNA positions in FASTA headers.
+xenoquant uses **xFASTA** to encode UB positions in FASTA headers.
 
-### Standard FASTA with XNA
+### Standard FASTA with UB
 
 ```fasta
 >reference_header
@@ -539,7 +539,7 @@ ATGGCAACAGGATGAGAAGGACGTA
 
 In xFASTA:
 
-- The **header** stores the XNA position
+- The **header** stores the UB position
 - The **sequence** contains the substituted canonical base
 
 ### Default substitutions
@@ -557,7 +557,7 @@ Substitution rules are configurable in:
 lib/xr_params.py
 ```
 
-### Allowed XNA abbreviations (default)
+### Allowed UB abbreviations (default)
 
 ```text
 B, S, P, Z, D, X
