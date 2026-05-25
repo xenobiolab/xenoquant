@@ -25,14 +25,8 @@ xna_base_pairs = ['BS','PZ','DX']
 confounding_pairs =  ['BA','ST','PG','ZC','DA','XT'] 
 
 
-#If XNAs are given different standard base substitutions, set them up as seperate (e.g, ['P','Z'])
-xna_segmentation_model_sets = ['B','S','P','Z','D','X']
-
 #Possible XNA bases
 xna_bases = np.concatenate(list(list(i) for i in xna_base_pairs))
-
-require_rc_fasta = True
-
 
 ######################XFASTA GENERATION######################
 
@@ -215,7 +209,5 @@ guppy_config_file = 'dna_r10.4.1_e8.2_400bps_hac.cfg'
 #barcode_kit = 'EXP-DUAL00'
 
        
-
-
 
 

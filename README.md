@@ -84,9 +84,21 @@ conda env create -f xenoquant-re.yml
 - 32 GB DDR4 (3200 MHz)
 ---
 
-## Core CLI: `xenoquant.py`
+## Reproducible Workflow: `xenoquant_pipe.py`
 
-### Sample Data Quickstart
+`xenoquant_pipe.py` is the recommended entry point for reproducing analyses.
+It wraps training, basecalling, demultiplexing, raw basecall analysis, and
+visualization behind a single configuration block and a set of Boolean switches.
+After editing the paths and switches at the top of the file, run:
+
+```bash
+python xenoquant_pipe.py
+```
+
+The script prints each command before execution, making the workflow traceable
+while avoiding the need to manually call each lower-level module.
+
+### Included sample data
 
 This repository includes small POD5 subsets for exercising the training,
 testing, and PCR basecalling workflows:
@@ -108,8 +120,14 @@ SAMPLE_DATA/
         └── EXPERIMENT_METADATA_B24_B25.csv
 ```
 
-Before running the examples, create and activate the environment, then verify
-that `lib/xr_params.py` points to your local Dorado binary and model:
+The sample data is intended as a minimal reproducible analysis and smoke test of
+the full pipeline. It is smaller than the full datasets used for manuscript
+model training.
+
+### Environment and parameters
+
+Before running `xenoquant_pipe.py`, create and activate the environment, then
+verify that `lib/xr_params.py` points to your local Dorado binary and model:
 
 ```bash
 conda env create -f xenoquant-re.yml
@@ -125,20 +143,52 @@ mod_base = "B"
 kmer_table_path = "models/remora/9mer_10-4-1.tsv"
 ```
 
-#### Train on the sample training subset
+For reproducibility, record any changes to these training parameters:
+
+```python
+mod_base = "B"
+can_base = "N"
+kmer_context = "4 4"
+chunk_context = "50 50"
+val_proportion = "0.2"
+chunk_num = "500000"
+balance_chunks = True
+ml_model_path = "models/ConvLSTM_w_ref.py"
+```
+
+### Minimal analysis using `xenoquant_pipe.py`
+
+Use the following examples by editing the configuration section at the top of
+`xenoquant_pipe.py`, then running `python xenoquant_pipe.py`.
+
+#### 1. Train a sample BS-vs-AT model
 
 The `BS_Train_subset` directory contains reads with the `B` XNA context, and
 `AT_Train_subset` is the matched canonical comparison set. Both use the same
 reference because the `B` in the FASTA marks the position used for chunking and
 model training.
 
-```bash
-python xenoquant.py train \
-    -w output/sample_training/BS_vs_AT \
-    -f SAMPLE_DATA/Training_Testing/pod5/BS_Train_subset \
-       SAMPLE_DATA/Training_Testing/pod5/AT_Train_subset \
-    -r SAMPLE_DATA/Training_Testing/references/90mer_train_test.fasta \
-       SAMPLE_DATA/Training_Testing/references/90mer_train_test.fasta
+```python
+# --- Training paths ---
+working_dir = "output/sample_training/BS_vs_AT"
+xna_fast5_dir = "SAMPLE_DATA/Training_Testing/pod5/BS_Train_subset"
+xna_ref_fasta = "SAMPLE_DATA/Training_Testing/references/90mer_train_test.fasta"
+dna_fast5_dir = "SAMPLE_DATA/Training_Testing/pod5/AT_Train_subset"
+dna_ref_fasta = "SAMPLE_DATA/Training_Testing/references/90mer_train_test.fasta"
+
+# --- Master switches ---
+train_model              = True
+basecall_reads           = False
+output_alignment_results = False
+cutadapt_demux           = False
+raw_basecall_analysis    = False
+
+# --- Visualization switches ---
+plot_signal_metrics    = False
+plot_signal_spaghetti  = False
+plot_signal_step       = False
+plot_signal_violin     = False
+extract_metrics        = False
 ```
 
 The trained model is written to:
@@ -147,58 +197,59 @@ The trained model is written to:
 output/sample_training/BS_vs_AT/model/model_best.pt
 ```
 
-#### Test on held-out subsets
+Training also writes preprocessing files, aligned BAMs, BED files, Remora
+chunks, and `validation.log` under `output/sample_training/BS_vs_AT/`.
+
+#### 2. Test the trained model on held-out subsets
 
 Run the trained model against the held-out `BS` and `AT` subsets. This is a
 quick functional test of model inference on data that was not used for training.
 
-```bash
-python xenoquant.py basecall \
-    -w output/sample_testing/BS_Test_subset \
-    -f SAMPLE_DATA/Training_Testing/pod5/BS_Test_subset \
-    -r SAMPLE_DATA/Training_Testing/references/90mer_train_test.fasta \
-    -m output/sample_training/BS_vs_AT/model/model_best.pt
+```python
+# --- Basecall paths ---
+bc_working_dir = "output/sample_testing/BS_Test_subset"
+bc_fast5_dir = "SAMPLE_DATA/Training_Testing/pod5/BS_Test_subset"
+bc_xna_ref_fasta = "SAMPLE_DATA/Training_Testing/references/90mer_train_test.fasta"
+bc_model_file = "output/sample_training/BS_vs_AT/model/model_best.pt"
 
-python xenoquant.py basecall \
-    -w output/sample_testing/AT_Test_subset \
-    -f SAMPLE_DATA/Training_Testing/pod5/AT_Test_subset \
-    -r SAMPLE_DATA/Training_Testing/references/90mer_train_test.fasta \
-    -m output/sample_training/BS_vs_AT/model/model_best.pt
+# --- Master switches ---
+train_model              = False
+basecall_reads           = True
+output_alignment_results = False
+cutadapt_demux           = False
+raw_basecall_analysis    = False
 ```
+
+To test the canonical held-out subset, change `bc_working_dir` to
+`output/sample_testing/AT_Test_subset` and `bc_fast5_dir` to
+`SAMPLE_DATA/Training_Testing/pod5/AT_Test_subset`, then rerun the pipe.
 
 Per-read predictions are written under each testing output directory in
 `remora_outputs/per-read_modifications.tsv`.
 
-#### Basecall the PCR sample dataset
+#### 3. Basecall, demultiplex, and summarize the PCR sample
 
 After training a model, apply it to the PCR POD5 subset with the PCR reference:
 
-```bash
-python xenoquant.py basecall \
-    -w output/sample_pcr/B24_B25 \
-    -f SAMPLE_DATA/PCR/pod5 \
-    -r SAMPLE_DATA/PCR/references/REF_B24_B25.fasta \
-    -m output/sample_training/BS_vs_AT/model/model_best.pt
+```python
+# --- Basecall paths ---
+bc_working_dir = "output/sample_pcr/B24_B25"
+bc_fast5_dir = "SAMPLE_DATA/PCR/pod5"
+bc_xna_ref_fasta = "SAMPLE_DATA/PCR/references/REF_B24_B25.fasta"
+barcode_pair_csv = "SAMPLE_DATA/PCR/references/DEMUX_B24_B25.csv"
+bc_model_file = "output/sample_training/BS_vs_AT/model/model_best.pt"
+
+# --- Master switches ---
+train_model              = False
+basecall_reads           = True
+output_alignment_results = False
+cutadapt_demux           = True
+raw_basecall_analysis    = True
 ```
 
 The PCR reference includes multiple B24/B25 amplicon sequences with the `B`
-position marked for reference-localized basecalling.
-
-#### Optional PCR demultiplexing and analysis
-
-The PCR sample includes barcode-pair metadata for cutadapt demultiplexing:
-
-```bash
-python lib/xr_demux.py \
-    output/sample_pcr/B24_B25 \
-    SAMPLE_DATA/PCR/references/DEMUX_B24_B25.csv
-```
-
-Then summarize raw basecall classes:
-
-```bash
-python lib/xr_raw_basecall_analysis.py output/sample_pcr/B24_B25 True
-```
+position marked for reference-localized basecalling. The barcode-pair CSV maps
+PCR products to forward and reverse barcode names for cutadapt demultiplexing.
 
 Demultiplexed per-read calls and summary tables are written under:
 
@@ -206,6 +257,44 @@ Demultiplexed per-read calls and summary tables are written under:
 output/sample_pcr/B24_B25/demux/
 output/sample_pcr/B24_B25/raw_basecall_analysis/
 ```
+
+### Reproducing trained models reported in the paper
+
+The same `xenoquant_pipe.py` workflow is used to reproduce the trained models
+reported in the paper. For each reported model or sequence context:
+
+1. Set `working_dir` to a new output directory for that model.
+2. Set `xna_fast5_dir` to the full POD5 or FAST5 directory containing the XNA
+   training reads.
+3. Set `dna_fast5_dir` to the matched canonical DNA training reads.
+4. Set `xna_ref_fasta` and `dna_ref_fasta` to the reference FASTA files used for
+   that model. The FASTA sequence must contain the XNA base abbreviation at the
+   position used for training.
+5. Confirm the XNA and canonical labels in `lib/xr_params.py`, especially
+   `mod_base`, `can_base`, `confounding_pairs`, `kmer_context`,
+   `chunk_context`, `chunk_num`, `val_proportion`, `balance_chunks`,
+   `ml_model_path`, and `kmer_table_path`.
+6. Set `train_model = True` and all unrelated downstream switches to `False`.
+7. Run `python xenoquant_pipe.py`.
+
+Each reproduced model is written to:
+
+```text
+[working_dir]/model/model_best.pt
+[working_dir]/model/validation.log
+```
+
+To reproduce downstream basecalling or PCR analyses from a trained paper model,
+set `bc_model_file` to the corresponding `model_best.pt`, set the basecalling
+POD5 directory and reference FASTA, then enable `basecall_reads`. Enable
+`cutadapt_demux` and `raw_basecall_analysis` when reproducing demultiplexed PCR
+summary tables.
+
+## Core CLI: `xenoquant.py`
+
+The commands below expose the lower-level training and basecalling entry points
+called by `xenoquant_pipe.py`. They are useful for debugging or running a single
+stage manually, but the pipe file is the recommended reproducibility interface.
 
 ### Training
 

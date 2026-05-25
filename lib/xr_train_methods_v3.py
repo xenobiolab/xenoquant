@@ -16,8 +16,7 @@ Keeps kmer_table_path relative in xr_params, resolves to absolute at runtime.
 import os
 import sys
 from pathlib import Path
-from typing import Optional
-from xr_tools  import *          # project helpers (fetch_xna_pos, xna_base_rc, etc.)
+from xr_tools  import *          # project helpers (fetch_xna_pos, etc.)
 from xr_params import *          # project parameters & booleans
 
 print('Xenoquant [STATUS] - Initializing Xenoquant...')
@@ -148,28 +147,6 @@ def fasta_to_xfasta(input_fa, ref_dir, prefix="x"):
     if rc != 0 or not os.path.exists(xfasta):
         raise RuntimeError(f"[ERROR] xFASTA conversion failed: {cmd}")
     return xfasta
-
-def rc_xfasta_candidate(path: str) -> Optional[str]:
-    """Return candidate RC filename our converter writes, if it exists."""
-    if path.endswith(".fasta"):
-        cand = path[:-6] + "_rc.fasta"
-    elif path.endswith(".fa"):
-        cand = path[:-3] + "_rc.fa"
-    else:
-        cand = path + "_rc.fa"
-    return cand if os.path.exists(cand) else None
-
-def xfasta_requires_rc(xfasta_path: str, xna_base: str) -> bool:
-    """Return True if headers indicate XNA on reverse strand."""
-    rc_symbol = xna_base_rc(xna_base, xna_base_pairs)
-    with open(os.path.expanduser(xfasta_path)) as f:
-        for ln in f:
-            if ln.startswith(">"):
-                for xb in fetch_xna_pos(ln[1:].strip()):
-                    base = xb[0]
-                    if base == rc_symbol:
-                        return True
-    return False
 
 def sanitize_fasta(input_fa, ref_dir, suffix="_clean"):
     """Rewrite headers to BAM-safe aliases: contig1, contig2, ..."""
@@ -440,18 +417,9 @@ def main():
     mod_xfasta = fasta_to_xfasta(xna_ref_fasta, ref_dir, prefix="x")
     can_xfasta = fasta_to_xfasta(dna_ref_fasta, ref_dir, prefix="x")
 
-    # Strand/orientation
-    if xfasta_requires_rc(mod_xfasta, mod_base):
-        cand_mod = rc_xfasta_candidate(mod_xfasta)
-        cand_can = rc_xfasta_candidate(can_xfasta)
-        if not cand_mod or not cand_can:
-            raise FileNotFoundError(f"[ERROR] RC xFASTA expected but not found for mod:{mod_xfasta}, can:{can_xfasta}")
-        print(f"[INFO] XNA on reverse strand; using RC xFASTAs: {cand_mod}, {cand_can}")
-        mod_xfasta, can_xfasta = cand_mod, cand_can
-    else:
-        print("[INFO] XNA on forward strand; using forward xFASTAs")
+    print("[INFO] Using xFASTAs generated directly from the provided reference FASTAs")
 
-    # Sanitize after deciding on RC
+    # Sanitize the same xFASTAs used for BED generation and alignment.
     mod_xfasta_clean, mod_alias_map = sanitize_fasta(mod_xfasta, ref_dir)
     can_xfasta_clean, can_alias_map = sanitize_fasta(can_xfasta, ref_dir)
 
@@ -525,4 +493,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
