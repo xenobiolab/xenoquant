@@ -124,6 +124,28 @@ The sample data is intended as a minimal reproducible analysis and smoke test of
 the full pipeline. It is smaller than the full datasets used for manuscript
 model training.
 
+### Zenodo data record
+
+Raw sequencing data sufficient to reproduce the models and figures reported in
+the manuscript are available from Zenodo:
+
+```text
+https://zenodo.org/records/19041986
+```
+
+The Zenodo record contains approximately 10% of the total raw sequencing data
+generated for the study. 
+
+The archived data are organized into two categories:
+
+1. Raw data used to generate trained models
+2. Raw data collected from PCR experiments and used to generate figures
+
+An Excel spreadsheet included in the Zenodo record describes the contents of the
+raw-data folders and identifies which models or figures each dataset can be used
+to reproduce. Use that spreadsheet together with the `xenoquant_pipe.py`
+configuration instructions below to reproduce specific manuscript outputs.
+
 ### Environment and parameters
 
 Before running `xenoquant_pipe.py`, create and activate the environment, then
